@@ -155,4 +155,4 @@ This allows you to change the entire app interface instantly without an App Stor
 Docker Permission Error (Mac) |	Enable File Sharing for your project folder in Docker Desktop → Settings → Resources.
 
 ## 📜 License
-This project is open-source and available under the MIT License.
+This project is open-source and available under the Apache 2.0 License.
