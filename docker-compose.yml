@@ -1,0 +1,66 @@
+services:
+  # 1. MongoDB (The Data Layer)
+  mongodb:
+    image: mongo:8.2.3
+    container_name: superapp-db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - ./mongo-seed:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 5s
+
+  # 2. Ollama (The AI Engine)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: superapp-ai
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+
+  # 3. Model Puller (Downloads Phi-3 automatically)
+  ollama-puller:
+    image: curlimages/curl:latest
+    depends_on:
+      - ollama
+    entrypoint: ["sh", "-c", "echo 'Waiting for Ollama...'; sleep 5; curl -X POST http://ollama:11434/api/pull -d '{\"name\": \"phi3\"}'"]
+
+  # 4. Java 21 Backend (The Brain)
+  backend:
+    build: ./backend
+    container_name: superapp-backend
+    ports:
+      - "8080:8080"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    environment:
+      - SPRING_DATA_MONGODB_URI=mongodb://mongodb:27017/superapp
+      
+      # FIX: Updated Environment Variables for LangChain4j
+      - LANGCHAIN4J_OLLAMA_CHAT_MODEL_BASE_URL=http://ollama:11434/
+      - LANGCHAIN4J_OLLAMA_CHAT_MODEL_MODEL_NAME=phi3
+      - SPRING_THREADS_VIRTUAL_ENABLED=true
+
+  # 5. Node.js Frontend (The Renderer)
+  frontend:
+    build: ./frontend
+    container_name: superapp-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - BACKEND_URL=http://backend:8080
+
+volumes:
+  mongo_data:
+  ollama_data:
